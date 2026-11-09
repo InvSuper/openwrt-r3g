@@ -38,7 +38,8 @@ env:
   #                luci-app-firewall 和 luci-proto-ppp，会把已删除的
   #                firewall4/ppp 又拉回来
   #   luci-i18n-base-zh-cn : 中文语言包（简体），LuCI 界面中文化
-  #   luci-mod-admin-full  : 完整管理模块，含 Software 软件包管理页
+  #   注意：不要加 luci-mod-admin-full —— 它依赖 pcap-dnsproxy 等未编译的包，
+  #         会导致 LuCI 初始化失败、系统关键服务起不来（build-5 的教训）
   #   ip-full    : 完整版 ip 命令，含 bridge vlan 子命令，调试 VLAN 必用
   #   tcpdump    : 抓包确认 IPTV 组播流走向
   #   ethtool    : 查看网口速率/协商状态
@@ -55,7 +56,7 @@ env:
   #   kmod-crypto-hw-eip93      : MT7621 硬件加密加速（无加密流量终结需求）
   #   kmod-usb3 / kmod-usb-ledtrig-usbport : R3G 的 USB3 口（本机纯交换用不到）
   PACKAGES: >-
-    luci-light luci-i18n-base-zh-cn luci-mod-admin-full
+    luci-light luci-i18n-base-zh-cn
     ip-full tcpdump ethtool nano htop
     -dnsmasq -odhcp6c -odhcpd-ipv6only
     -firewall4 -nftables -kmod-nft-offload
