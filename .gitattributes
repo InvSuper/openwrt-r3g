@@ -1,0 +1,4 @@
+# 统一强制 LF 换行符
+# 原因：Windows 上编辑/检出文件容易带上 CRLF，而路由器上的 shell 脚本
+#       （uci-defaults）遇到 CRLF 会因找不到解释器 "/bin/sh\r" 而执行失败
+* text=auto eol=lf

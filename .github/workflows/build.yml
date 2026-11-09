@@ -1,0 +1,98 @@
+name: 编译 OpenWrt 固件
+
+# 触发方式：仅在 Actions 页面手动点击 "Run workflow" 时编译
+# 手动触发的原因：固件编译是低频操作，按需触发即可，不浪费 CI 额度
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: '设备 Profile（务必与路由器底部标签型号一致，刷错会变砖）'
+        required: true
+        type: choice
+        default: 'xiaomi_mi-router-4a-gigabit'
+        options:
+          - 'xiaomi_mi-router-4a-gigabit'      # 小米路由器4A 千兆版 v1
+          - 'xiaomi_mi-router-4a-gigabit-v2'   # 小米路由器4A 千兆版 v2
+          - 'xiaomi_mi-router-4'               # 小米路由器4（NAND 版，与 4A 不通用）
+
+env:
+  # 官方 ImageBuilder 地址：25.12-SNAPSHOT / ramips / mt7621
+  # ImageBuilder 是 OpenWrt 官方"固件组装器"：内核和软件包已预编译好，
+  # 只按 PACKAGES 清单增删软件包后打包成固件，几分钟出结果；
+  # 相比从源码全量编译（数小时且容易失败），增删包的场景用它最合适
+  IB_URL: https://downloads.openwrt.org/releases/25.12-SNAPSHOT/targets/ramips/mt7621/openwrt-imagebuilder-25.12-SNAPSHOT-ramips-mt7621.Linux-x86_64.tar.zst
+
+  # 包清单：在官方默认包的基础上增删（- 前缀 = 从默认包中移除）
+  #
+  # 默认包参考（25.12-SNAPSHOT 官方 profiles.json）：
+  #   apk-mbedtls base-files ca-bundle dnsmasq dropbear firewall4 fstools
+  #   kmod-crypto-hw-eip93 kmod-gpio-button-hotplug kmod-leds-gpio kmod-nft-offload
+  #   libc libgcc libustream-mbedtls logd mtd netifd nftables odhcp6c odhcpd-ipv6only
+  #   ppp ppp-mod-pppoe procd-ujail uboot-envtools uci uclient-fetch urandom-seed urngd
+  #   wpad-basic-mbedtls + 设备自带 kmod-mt7603 kmod-mt76x2
+  #
+  # 新增的包：
+  #   luci-light : 最小 Web 管理界面。注意不用 luci 完整包 —— 它依赖
+  #                luci-app-firewall 和 luci-proto-ppp，会把已删除的
+  #                firewall4/ppp 又拉回来
+  #   ip-full    : 完整版 ip 命令，含 bridge vlan 子命令，调试 VLAN 必用
+  #   tcpdump    : 抓包确认 IPTV 组播流走向
+  #   ethtool    : 查看网口速率/协商状态
+  #
+  # 删除的包（本机是纯二层 VLAN 交换机，以下全部用不上）：
+  #   dnsmasq / odhcpd-ipv6only : DHCP/DNS 服务（由主路由 ZN M2 负责）
+  #   odhcp6c                   : IPv6 客户端
+  #   firewall4 / nftables / kmod-nft-offload : 防火墙（二层桥不过三层流量）
+  #   ppp / ppp-mod-pppoe       : 拨号（主路由负责）
+  #   wpad-basic-mbedtls / kmod-mt7603 / kmod-mt76x2 : WiFi 套件与驱动（不用无线）
+  #   uboot-envtools            : 读写 bootloader 环境变量（正常用不到）
+  #   kmod-crypto-hw-eip93      : MT7621 硬件加密加速（无加密流量终结需求）
+  PACKAGES: >-
+    luci-light ip-full tcpdump ethtool
+    -dnsmasq -odhcp6c -odhcpd-ipv6only
+    -firewall4 -nftables -kmod-nft-offload
+    -ppp -ppp-mod-pppoe
+    -wpad-basic-mbedtls -kmod-mt7603 -kmod-mt76x2
+    -uboot-envtools -kmod-crypto-hw-eip93
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出本仓库
+        uses: actions/checkout@v4
+
+      - name: 安装编译依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential wget zstd rsync file \
+            gawk gettext libncurses-dev libssl-dev unzip python3
+
+      - name: 下载并解压 ImageBuilder
+        run: |
+          wget -q "$IB_URL" -O imagebuilder.tar.zst
+          tar --zstd -xf imagebuilder.tar.zst
+          mv openwrt-imagebuilder-* imagebuilder
+
+      - name: 编译固件
+        run: |
+          cd imagebuilder
+          FILES_ARG=""
+          if [ -d ../files ]; then
+            cp -r ../files ./files
+            FILES_ARG="FILES=files"
+          fi
+          make image PROFILE="${{ inputs.profile }}" PACKAGES="${PACKAGES}" $FILES_ARG
+
+      - name: 列出生成的固件
+        run: ls -lh imagebuilder/bin/targets/ramips/mt7621/
+
+      - name: 上传固件产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-${{ inputs.profile }}
+          path: |
+            imagebuilder/bin/targets/ramips/mt7621/*sysupgrade*.bin
+            imagebuilder/bin/targets/ramips/mt7621/*initramfs*.bin
+            imagebuilder/bin/targets/ramips/mt7621/sha256sums
+          retention-days: 90
