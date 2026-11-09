@@ -18,8 +18,7 @@ env:
   # 官方 ImageBuilder 地址：25.12.6 稳定版 / ramips / mt7621
   # 选用稳定版而不是 25.12-SNAPSHOT 的原因：快照每天滚动更新，同一个 commit 今天编和
   # 明天编出来的内核、驱动、包版本都可能不同，出现问题时无法定位；稳定版固定不变，可复现
-  # 升级方式：改 IB_RELEASE 这一处即可（例如 25.12.7 发布后把版本号换掉）
-  IB_RELEASE: '25.12.6'
+  # 升级方式：只改下面 IB_URL 里的版本号（路径和文件名各出现一次，两处都要替换）
   IB_URL: https://downloads.openwrt.org/releases/25.12.6/targets/ramips/mt7621/openwrt-imagebuilder-25.12.6-ramips-mt7621.Linux-x86_64.tar.zst
 
   # 包清单：在官方默认包的基础上增删（- 前缀 = 从默认包中移除）
