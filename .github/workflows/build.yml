@@ -6,14 +6,13 @@ on:
   workflow_dispatch:
     inputs:
       profile:
-        description: '设备 Profile（务必与路由器底部标签型号一致，刷错会变砖）'
+        description: '设备 Profile（已确认为小米路由器3G R3G v1 NAND 版，Breed 布局=小米 R3G OpenWrt）'
         required: true
         type: choice
-        default: 'xiaomi_mi-router-4a-gigabit'
+        default: 'xiaomi_mi-router-3g'
         options:
-          - 'xiaomi_mi-router-4a-gigabit'      # 小米路由器4A 千兆版 v1
-          - 'xiaomi_mi-router-4a-gigabit-v2'   # 小米路由器4A 千兆版 v2
-          - 'xiaomi_mi-router-4'               # 小米路由器4（NAND 版，与 4A 不通用）
+          - 'xiaomi_mi-router-3g'      # 小米路由器3G v1（128MB NAND，kernel1+rootfs0 双分区，本仓库目标设备）
+          - 'xiaomi_mi-router-3g-v2'   # 小米路由器3G v2（16MB NOR 缩水版，布局不同，勿混刷）
 
 env:
   # 官方 ImageBuilder 地址：25.12-SNAPSHOT / ramips / mt7621
@@ -30,6 +29,7 @@ env:
   #   libc libgcc libustream-mbedtls logd mtd netifd nftables odhcp6c odhcpd-ipv6only
   #   ppp ppp-mod-pppoe procd-ujail uboot-envtools uci uclient-fetch urandom-seed urngd
   #   wpad-basic-mbedtls + 设备自带 kmod-mt7603 kmod-mt76x2
+  #   （R3G 额外带 kmod-usb3 kmod-usb-ledtrig-usbport，一并删除）
   #
   # 新增的包：
   #   luci-light : 最小 Web 管理界面。注意不用 luci 完整包 —— 它依赖
@@ -47,12 +47,14 @@ env:
   #   wpad-basic-mbedtls / kmod-mt7603 / kmod-mt76x2 : WiFi 套件与驱动（不用无线）
   #   uboot-envtools            : 读写 bootloader 环境变量（正常用不到）
   #   kmod-crypto-hw-eip93      : MT7621 硬件加密加速（无加密流量终结需求）
+  #   kmod-usb3 / kmod-usb-ledtrig-usbport : R3G 的 USB3 口（本机纯交换用不到）
   PACKAGES: >-
     luci-light ip-full tcpdump ethtool
     -dnsmasq -odhcp6c -odhcpd-ipv6only
     -firewall4 -nftables -kmod-nft-offload
     -ppp -ppp-mod-pppoe
     -wpad-basic-mbedtls -kmod-mt7603 -kmod-mt76x2
+    -kmod-usb3 -kmod-usb-ledtrig-usbport
     -uboot-envtools -kmod-crypto-hw-eip93
 
 jobs:
@@ -87,12 +89,13 @@ jobs:
       - name: 列出生成的固件
         run: ls -lh imagebuilder/bin/targets/ramips/mt7621/
 
+      # 上传全部 .bin：Breed 刷 NAND 双分区布局需要 kernel1.bin + rootfs0.bin 两个文件
+      # （分别对应 Breed 页面的两个上传框）；sysupgrade.bin 留作日后系统内升级用
       - name: 上传固件产物
         uses: actions/upload-artifact@v4
         with:
           name: openwrt-${{ inputs.profile }}
           path: |
-            imagebuilder/bin/targets/ramips/mt7621/*sysupgrade*.bin
-            imagebuilder/bin/targets/ramips/mt7621/*initramfs*.bin
+            imagebuilder/bin/targets/ramips/mt7621/*.bin
             imagebuilder/bin/targets/ramips/mt7621/sha256sums
           retention-days: 90
