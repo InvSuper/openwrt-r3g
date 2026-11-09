@@ -134,7 +134,7 @@ jobs:
 
           **Breed 刷机**：\`*-squashfs-kernel1.bin\` 传第一个框，\`*-squashfs-rootfs0.bin\` 传第二个框。
           **系统内升级**：\`*-squashfs-sysupgrade.bin\`（LuCI 系统→备份升级 或 sysupgrade 命令）。
-          **管理地址**：192.168.0.4（首次开机由 uci-defaults 预设，账号 root/root）。
+          **管理地址**：192.168.0.2（首次开机由 uci-defaults 预设，账号 root/root）。
           EOF
           )
           # 用 ls 展开实际存在的文件，避免某个镜像类型不存在时 gh 报错
