@@ -60,6 +60,9 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # 创建 Release 需要写权限；GitHub 默认给 GITHUB_TOKEN 只读，必须显式提权
+    permissions:
+      contents: write
     steps:
       - name: 检出本仓库
         uses: actions/checkout@v4
@@ -99,3 +102,46 @@ jobs:
             imagebuilder/bin/targets/ramips/mt7621/*.bin
             imagebuilder/bin/targets/ramips/mt7621/sha256sums
           retention-days: 90
+
+      # 从本次 ImageBuilder 产出的 profiles.json 中读取真实版本号
+      # 原因：SNAPSHOT 每天滚动更新，必须记录"这个固件是由哪天哪个 revision 编出来的"
+      - name: 读取本次固件版本
+        id: ver
+        run: |
+          PJ=imagebuilder/bin/targets/ramips/mt7621/profiles.json
+          VER=$(python3 -c "import json;print(json.load(open('$PJ'))['version_number'])" 2>/dev/null || true)
+          CODE=$(python3 -c "import json;print(json.load(open('$PJ'))['version_code'])" 2>/dev/null || true)
+          echo "version=${VER:-unknown}" >> "$GITHUB_OUTPUT"
+          echo "code=${CODE:-unknown}" >> "$GITHUB_OUTPUT"
+
+      # 自动发布 Release：把固件挂到仓库首页 Releases 区，手机上不用再翻 Actions
+      # 使用 runner 自带的 gh CLI（ubuntu-latest 预装），不引入第三方 action
+      # 标记为 prerelease：因为是 SNAPSHOT 滚动快照，不是稳定版
+      - name: 发布 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VER: ${{ steps.ver.outputs.version }}
+          CODE: ${{ steps.ver.outputs.code }}
+          PROFILE: ${{ inputs.profile }}
+        run: |
+          TAG="build-${{ github.run_number }}"
+          NOTES=$(cat <<EOF
+          由 GitHub Actions 自动构建（上游为 OpenWrt 滚动快照，非稳定版）。
+
+          - 上游版本：OpenWrt ${VER}（${CODE}）
+          - 设备 Profile：\`${PROFILE}\`
+          - 包清单：\`${PACKAGES}\`
+
+          **Breed 刷机**：\`*-squashfs-kernel1.bin\` 传第一个框，\`*-squashfs-rootfs0.bin\` 传第二个框。
+          **系统内升级**：\`*-squashfs-sysupgrade.bin\`（LuCI 系统→备份升级 或 sysupgrade 命令）。
+          **管理地址**：192.168.0.4（首次开机由 uci-defaults 预设，账号 root/root）。
+          EOF
+          )
+          # 用 ls 展开实际存在的文件，避免某个镜像类型不存在时 gh 报错
+          FILES=$(ls imagebuilder/bin/targets/ramips/mt7621/*.bin \
+                    imagebuilder/bin/targets/ramips/mt7621/sha256sums)
+          gh release create "$TAG" \
+            --title "OpenWrt ${VER} (${CODE}) · ${PROFILE}" \
+            --prerelease \
+            --notes "$NOTES" \
+            $FILES
