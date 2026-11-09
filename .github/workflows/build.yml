@@ -33,37 +33,31 @@ env:
   #   （R3G 才额外带 kmod-usb3 kmod-usb-ledtrig-usbport；小米4 的默认包不含 USB，
   #    这两个 - 前缀在 4 的 profile 下是多余的，但 ImageBuilder 会静默忽略，保留无害）
   #
-  # 新增的包：
-  #   luci-light : 最小 Web 管理界面。注意不用 luci 完整包 —— 它依赖
-  #                luci-app-firewall 和 luci-proto-ppp，会把已删除的
-  #                firewall4/ppp 又拉回来
-  #   luci-i18n-base-zh-cn : 中文语言包（简体），LuCI 界面中文化
-  #   注意：不要加 luci-mod-admin-full —— 它依赖 pcap-dnsproxy 等未编译的包，
-  #         会导致 LuCI 初始化失败、系统关键服务起不来（build-5 的教训）
-  #   ip-full    : 完整版 ip 命令，含 bridge vlan 子命令，调试 VLAN 必用
-  #   tcpdump    : 抓包确认 IPTV 组播流走向
-  #   ethtool    : 查看网口速率/协商状态
-  #   nano       : 文本编辑器（比 vi 友好，紧急改配置用）
-  #   htop       : 交互式进程查看器
+  # 包策略：保守为主，确保基础功能（SSH、LuCI、网络）稳定
+  # 教训：build-5 加 luci-mod-admin-full 导致依赖缺失系统崩溃；
+  #       build-6 过度精简导致 dropbear 起不来。本版本回归稳定优先。
   #
-  # 删除的包（本机是纯二层 VLAN 交换机，以下全部用不上）：
-  #   dnsmasq / odhcpd-ipv6only : DHCP/DNS 服务（由主路由 ZN M2 负责）
-  #   odhcp6c                   : IPv6 客户端
-  #   firewall4 / nftables / kmod-nft-offload : 防火墙（二层桥不过三层流量）
-  #   ppp / ppp-mod-pppoe       : 拨号（主路由负责）
-  #   wpad-basic-mbedtls / kmod-mt7603 / kmod-mt76x2 : WiFi 套件与驱动（不用无线）
-  #   uboot-envtools            : 读写 bootloader 环境变量（正常用不到）
-  #   kmod-crypto-hw-eip93      : MT7621 硬件加密加速（无加密流量终结需求）
-  #   kmod-usb3 / kmod-usb-ledtrig-usbport : R3G 的 USB3 口（本机纯交换用不到）
+  # 保留官方默认包（只明确删 WiFi 和 PPP，其他不动）：
+  #   dnsmasq : 保留，避免删除后影响系统初始化
+  #   firewall4 / nftables : 保留，避免影响网络栈
+  #   odhcp6c / odhcpd-ipv6only : 保留，IPv6 由 ZN M2 管理，但保留客户端无害
+  #
+  # 明确删除（确实用不上且安全的）：
+  #   ppp / ppp-mod-pppoe : 不拨号
+  #   wpad-basic-mbedtls / kmod-mt7603 / kmod-mt76x2 : 不用 WiFi
+  #   kmod-usb3 / kmod-usb-ledtrig-usbport : 不用 USB（R3G 才有，4 没有）
+  #
+  # 新增：
+  #   luci-light : 基础 Web 界面
+  #   luci-i18n-base-zh-cn : 中文语言包
+  #   luci-app-commands : LuCI 命令执行页面（备用终端）
+  #   ip-full / tcpdump / ethtool / nano / htop : 调试工具
   PACKAGES: >-
-    luci-light luci-i18n-base-zh-cn
+    luci-light luci-i18n-base-zh-cn luci-app-commands
     ip-full tcpdump ethtool nano htop
-    -dnsmasq -odhcp6c -odhcpd-ipv6only
-    -firewall4 -nftables -kmod-nft-offload
     -ppp -ppp-mod-pppoe
     -wpad-basic-mbedtls -kmod-mt7603 -kmod-mt76x2
     -kmod-usb3 -kmod-usb-ledtrig-usbport
-    -uboot-envtools -kmod-crypto-hw-eip93
 
 jobs:
   build:
