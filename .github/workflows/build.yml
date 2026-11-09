@@ -6,13 +6,14 @@ on:
   workflow_dispatch:
     inputs:
       profile:
-        description: '设备 Profile（已确认为小米路由器3G R3G v1 NAND 版，Breed 布局=小米 R3G OpenWrt）'
+        description: '设备 Profile（本机=小米路由器4 R4，机身标签已确认；Breed 布局=小米 R3G/4 双分区 NAND）'
         required: true
         type: choice
-        default: 'xiaomi_mi-router-3g'
+        default: 'xiaomi_mi-router-4'
         options:
-          - 'xiaomi_mi-router-3g'      # 小米路由器3G v1（128MB NAND，kernel1+rootfs0 双分区，本仓库目标设备）
-          - 'xiaomi_mi-router-3g-v2'   # 小米路由器3G v2（16MB NOR 缩水版，布局不同，勿混刷）
+          - 'xiaomi_mi-router-4'        # 小米路由器4 R4（128MB NAND，kernel1+rootfs0 双分区，本仓库目标设备）
+          - 'xiaomi_mi-router-3g'       # 小米路由器3G R3G v1（布局相同，备用）
+          - 'xiaomi_mi-router-4a-gigabit' # 小米路由器4A千兆版 R4A（16MB NOR，布局不同，备用）
 
 env:
   # 官方 ImageBuilder 地址：25.12.6 稳定版 / ramips / mt7621
@@ -29,7 +30,8 @@ env:
   #   libc libgcc libustream-mbedtls logd mtd netifd nftables odhcp6c odhcpd-ipv6only
   #   ppp ppp-mod-pppoe procd-ujail uboot-envtools uci uclient-fetch urandom-seed urngd
   #   wpad-basic-mbedtls + 设备自带 kmod-mt7603 kmod-mt76x2
-  #   （R3G 额外带 kmod-usb3 kmod-usb-ledtrig-usbport，一并删除）
+  #   （R3G 才额外带 kmod-usb3 kmod-usb-ledtrig-usbport；小米4 的默认包不含 USB，
+  #    这两个 - 前缀在 4 的 profile 下是多余的，但 ImageBuilder 会静默忽略，保留无害）
   #
   # 新增的包：
   #   luci-light : 最小 Web 管理界面。注意不用 luci 完整包 —— 它依赖
